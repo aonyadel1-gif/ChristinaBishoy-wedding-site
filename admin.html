@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>إدارة دفتر التهاني</title>
+<script src="config.js"></script>
+<style>
+*{box-sizing:border-box;margin:0}body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:#faf6ee;color:#2e332d;padding:20px;line-height:1.7}
+.w{max-width:640px;margin:auto}h1{font-size:1.4rem;color:#9a7632;margin-bottom:14px}
+input,button{font:inherit;padding:11px 14px;border-radius:10px;border:1px solid #dccfae;width:100%;margin-bottom:10px;background:#fff}
+button{cursor:pointer;background:#9a7632;color:#fff;border:0;width:auto;margin:0}
+button.g{background:#fff;color:#2e332d;border:1px solid #dccfae}button.r{background:#b4443b}
+.bar{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.m{background:#fff;border:1px solid #dccfae;border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.m b{color:#9a7632}.m p{white-space:pre-wrap;overflow-wrap:anywhere}.m small{color:#777}.act{display:flex;gap:8px;margin-top:8px}
+#err,#st{color:#b4443b}
+</style></head><body><div class="w">
+<div id="login"><h1>إدارة دفتر التهاني</h1><input id="em" type="email" placeholder="البريد الإلكتروني"><input id="pw" type="password" placeholder="كلمة المرور"><button id="go">دخول</button><p id="err"></p></div>
+<div id="app" hidden><h1>رسائل التهنئة</h1>
+<div class="bar"><button id="b1">في الانتظار <span id="cp"></span></button><button class="g" id="b2">المنشورة <span id="ca"></span></button><button class="g" id="rf">تحديث</button><button class="g" id="out">خروج</button></div>
+<p id="st"></p><div id="list"></div></div></div>
+<script>
+var C=window.WC||{},tok=sessionStorage.getItem('tok'),flt='pending',all=[];
+function $(i){return document.getElementById(i)}
+function H(){var h={apikey:C.key,'Content-Type':'application/json'};var t=tok||(C.key.indexOf('eyJ')===0?C.key:'');if(t)h.Authorization='Bearer '+t;return h}
+function show(){$('login').hidden=!!tok;$('app').hidden=!tok;if(tok)load()}
+$('go').onclick=function(){$('err').textContent='';fetch(C.url+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:C.key,'Content-Type':'application/json'},body:JSON.stringify({email:$('em').value.trim(),password:$('pw').value})}).then(function(r){return r.json()}).then(function(j){if(!j.access_token)throw new Error(j.error_description||j.msg||'login');tok=j.access_token;sessionStorage.setItem('tok',tok);show()}).catch(function(e){$('err').textContent='تعذّر الدخول: '+e.message})};
+$('out').onclick=function(){sessionStorage.removeItem('tok');tok=null;show()};
+$('rf').onclick=load;
+$('b1').onclick=function(){flt='pending';$('b1').className='';$('b2').className='g';draw()};
+$('b2').onclick=function(){flt='approved';$('b2').className='';$('b1').className='g';draw()};
+function load(){$('st').textContent='';fetch(C.url+'/rest/v1/wishes?select=*&order=created_at.desc&limit=500',{headers:H()}).then(function(r){if(r.status===401){sessionStorage.removeItem('tok');tok=null;show();$('err').textContent='انتهت الجلسة، سجّل دخول تاني';throw 0}if(!r.ok)return r.text().then(function(t){$('st').textContent='تعذّر تحميل الرسائل (كود '+r.status+'): '+t;throw 0});return r.json()}).then(function(a){all=a;draw()}).catch(function(){})}
+function call(m,id,body){return fetch(C.url+'/rest/v1/wishes?id=eq.'+id,{method:m,headers:H(),body:body?JSON.stringify(body):undefined}).then(load)}
+function draw(){var L=$('list');L.textContent='';$('cp').textContent='('+all.filter(function(x){return!x.approved}).length+')';$('ca').textContent='('+all.filter(function(x){return x.approved}).length+')';
+ all.filter(function(x){return flt==='approved'?x.approved:!x.approved}).forEach(function(x){var d=document.createElement('div'),b=document.createElement('b'),p=document.createElement('p'),s=document.createElement('small'),a=document.createElement('div');d.className='m';b.textContent=x.name;p.textContent=x.text;s.textContent=new Date(x.created_at).toLocaleString('ar-EG');a.className='act';
+  if(!x.approved){var ok=document.createElement('button');ok.textContent='نشر ✓';ok.onclick=function(){call('PATCH',x.id,{approved:true})};a.appendChild(ok)}else{var hd=document.createElement('button');hd.className='g';hd.textContent='إخفاء';hd.onclick=function(){call('PATCH',x.id,{approved:false})};a.appendChild(hd)}
+  var del=document.createElement('button');del.className='r';del.textContent='حذف';del.onclick=function(){if(confirm('حذف نهائي؟'))call('DELETE',x.id)};a.appendChild(del);d.append(b,p,s,a);L.appendChild(d)});
+ if(!L.children.length){var e=document.createElement('p');e.textContent='لا توجد رسائل هنا حاليًا.';L.appendChild(e)}}
+show();
+</script></body></html>
